@@ -27,7 +27,11 @@ else:
     L = st.sidebar.number_input("インダクタンス L [H]", min_value=0.01, max_value=100.0, step=0.1, key="tr_L")
     tau = L / R
     final, unit, sym = E / R, "A", "i"
-h = st.sidebar.select_slider("時間のきざみ h = Δt / τ", options=[0.05, 0.1, 0.2, 0.5, 1.0, 1.5, 1.9, 2.1, 2.5], key="tr_h")
+# RC 回路は h ≦ 1 の範囲だけ。RL 回路では、きざみが粗すぎると振動・発散する様子も見られるようにする
+H_OPTIONS = [0.05, 0.1, 0.2, 0.3, 0.5, 0.8, 1.0] if kind == "RC" else [0.05, 0.1, 0.2, 0.5, 1.0, 1.5, 1.9, 2.1, 2.5]
+if st.session_state["tr_h"] not in H_OPTIONS:
+    st.session_state["tr_h"] = 0.2
+h = st.sidebar.select_slider("時間のきざみ h = Δt / τ", options=H_OPTIONS, key="tr_h")
 t_end = 5.0 if h <= 1 else 8 * h  # τ の何倍まで（きざみが粗いときは 8 ステップ分）
 
 N = int(round(t_end / h))
@@ -88,6 +92,7 @@ $$E - x_{n+1} = (1 - h)(E - x_n)\qquad\Longrightarrow\qquad x_n = E\{1 - (1 - h)
 正しい変化 $E(1 - e^{-t/\tau})$ になる（$e \approx 2.718$ は 2 年生以降で学ぶ数）。
 
 **$h$ が大きすぎると**　公比 $1 - h$ が負になると振動し、$|1 - h| > 1$（$h > 2$）では発散する。
+（このページでは、RL 回路を選ぶと $h > 1$ のきざみも選べるので、振動・発散の様子をアニメーションで確かめられる。）
 コンピュータで計算するときは、きざみを時定数よりじゅうぶん小さくとる必要がある。
 
 この方法（**オイラー法**）は、回路だけでなく、温度の変化、物体の運動など、変化のしかたがわかっている量を計算するときの基本。
