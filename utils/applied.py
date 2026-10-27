@@ -392,3 +392,57 @@ def savings_closed(P: float, r: float, n: int) -> float:
 def savings_payment(target: float, r: float, n: int) -> float:
     """n 期後に target にするための毎期の積立額"""
     return target / n if r == 0 else target * r / ((1 + r) ** n - 1)
+
+
+# =====================================================================
+# 物理：空気抵抗のある斜方投射（漸化式で 1 ステップずつ計算する）
+# =====================================================================
+# 空気抵抗の強さ k = ρ C_d A / (2m) [1/m]（抵抗による加速度の大きさ = k v²）。値は目安
+BALLS = {
+    "空気抵抗なし": 0.0,
+    "砲丸（7.26 kg）": 0.00044,
+    "野球のボール": 0.0061,
+    "サッカーボール": 0.013,
+    "ピンポン球": 0.14,
+    "バドミントンのシャトル": 0.26,
+}
+
+
+def projectile_drag(v0: float, deg: float, k: float, dt: float = 0.002, g: float = G, t_max: float = 120.0):
+    """速さの 2 乗に比例する空気抵抗 a = −k|v|v − g(0, 1) を、オイラー法の漸化式で計算する。
+        x_{n+1} = x_n + vx_n Δt,  y_{n+1} = y_n + vy_n Δt
+        vx_{n+1} = vx_n − k|v_n| vx_n Δt,  vy_{n+1} = vy_n − (g + k|v_n| vy_n) Δt
+    地面（y = 0）に着いた所で止める（最後の点は直線で補間）。戻り値 (ts, xs, ys)"""
+    th = math.radians(deg)
+    x, y, vx, vy, t = 0.0, 0.0, v0 * math.cos(th), v0 * math.sin(th), 0.0
+    ts, xs, ys = [0.0], [0.0], [0.0]
+    while t < t_max:
+        sp = math.hypot(vx, vy)
+        nx, ny = x + vx * dt, y + vy * dt
+        vx, vy = vx - k * sp * vx * dt, vy - (g + k * sp * vy) * dt
+        t += dt
+        if ny < 0:
+            f = y / (y - ny)
+            ts.append(t - dt + f * dt); xs.append(x + f * (nx - x)); ys.append(0.0)
+            break
+        x, y = nx, ny
+        ts.append(t); xs.append(x); ys.append(y)
+    return ts, xs, ys
+
+
+def projectile_summary(v0: float, deg: float, k: float, dt: float = 0.002) -> dict:
+    ts, xs, ys = projectile_drag(v0, deg, k, dt)
+    i = max(range(len(ys)), key=ys.__getitem__)
+    return dict(range=xs[-1], height=ys[i], time=ts[-1], t_top=ts[i], x_top=xs[i])
+
+
+def best_angle(v0: float, k: float, dt: float = 0.005, step: float = 0.5) -> tuple[float, float]:
+    """飛距離が最大になる角度（step° きざみで探す）と、その飛距離"""
+    best = (45.0, -1.0)
+    a = step
+    while a < 90:
+        r = projectile_drag(v0, a, k, dt)[1][-1]
+        if r > best[1]:
+            best = (a, r)
+        a += step
+    return best

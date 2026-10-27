@@ -22,7 +22,18 @@ def build_html(name: str, params: dict) -> str:
     return page.replace("/*__COMMON__*/", common).replace("/*__PARAMS__*/", json.dumps(params, ensure_ascii=False))
 
 
+def missing_files(name: str) -> list[str]:
+    """アニメーションに必要なのに見つからないファイル（GitHub へのアップロードもれの確認用）"""
+    return [f"assets/{f}" for f in (f"{name}.html", "anim_common.js") if not (ASSETS / f).exists()]
+
+
 def render(name: str, params: dict, height: int) -> None:
+    import streamlit as st
     import streamlit.components.v1 as components
 
+    missing = missing_files(name)
+    if missing:
+        st.error("アニメーションのファイルが見つからないため、アニメーションを表示できません："
+                 + "、".join(missing) + "。GitHub の assets フォルダにアップロードしてください。")
+        return
     components.html(build_html(name, params), height=height, scrolling=True)
