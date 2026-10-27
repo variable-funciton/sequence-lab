@@ -15,6 +15,7 @@ PAGES = {
     "数列": [
         st.Page("views/arithmetic.py", title="等差数列とその和", icon="📶", url_path="arithmetic"),
         st.Page("views/geometric.py", title="等比数列とその和", icon="✖️", url_path="geometric"),
+        st.Page("views/series.py", title="いろいろな数列の和（収束・発散）", icon="♾️", url_path="series"),
         st.Page("views/interest.py", title="単利と複利（等差・等比）", icon="💹", url_path="interest"),
         st.Page("views/recurrence_loan.py", title="漸化式で見るローン返済", icon="🔁", url_path="recurrence_loan"),
 
@@ -23,6 +24,7 @@ PAGES = {
     ],
     "物理への応用": [
         st.Page("views/bounce.py", title="ボールの跳ね返り（無限等比級数）", icon="🏀", url_path="bounce"),
+        st.Page("views/projectile_drag.py", title="空気抵抗のある斜方投射", icon="⚾", url_path="projectile_drag"),
     ],
     "機械系のための数列": [
         st.Page("views/preferred_numbers.py", title="標準数（ルナール数列）", icon="📏", url_path="preferred_numbers"),
