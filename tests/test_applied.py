@@ -161,6 +161,23 @@ def test_projectile_drag():
     assert abs(a0 - 45) <= 0.5
 
 
+def test_newton():
+    from utils.newton import (bisection, correct_digits, heron, newton, poly_tex, reciprocal, true_sqrt)
+    from fractions import Fraction
+    xs, t = heron(2, 1, 7), true_sqrt(2)
+    d = [correct_digits(x, t) for x in xs]
+    assert d[:7] == [0, 1, 2, 5, 11, 24, 48]                    # 正しい桁数がほぼ倍々
+    assert abs(float(xs[3]) - 577 / 408) < 1e-15
+    for x in xs[1:]:
+        assert x >= t                                          # 相加相乗平均：n ≧ 1 で √2 以上
+    bs = bisection(2, 1, 2, 10)
+    assert float(bs[10][1] - bs[10][0]) == 2 ** -10
+    near(newton([1, 0, -2, -5], 2.0, 8)[-1], 2.0945514815423265)
+    assert newton([1, 0, -2, 2], 0.0, 4) == [0.0, 1.0, 0.0, 1.0, 0.0]
+    near(reciprocal(7, 0.1, 8)[-1], 1 / 7)
+    assert poly_tex([1, 0, -2, -5]) == "x^{3} - 2x - 5"
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_") and callable(fn):
