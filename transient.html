@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body { margin: 0; font-family: "Source Sans Pro", "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif; color: #262730; background: #fff; }
+.bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 4px 0 8px; }
+button { font: inherit; padding: 5px 14px; border: 1px solid #d0d3da; border-radius: 8px; background: #fff; cursor: pointer; }
+button.main { background: #ff4b4b; color: #fff; border-color: #ff4b4b; }
+.speed { display: inline-flex; border: 1px solid #d0d3da; border-radius: 8px; overflow: hidden; }
+.speed button { border: 0; border-radius: 0; padding: 5px 10px; }
+.speed button.on { background: #1f77b4; color: #fff; }
+.row { display: grid; grid-template-columns: minmax(220px, 0.42fr) minmax(0, 1fr); gap: 10px; }
+@media (max-width: 680px) { .row { grid-template-columns: 1fr; } }
+canvas { width: 100%; height: 300px; display: block; border: 1px solid #eee; border-radius: 8px; }
+.info { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 8px; font-size: 14px; }
+.info b { color: #d62728; font-variant-numeric: tabular-nums; }
+.step { margin-top: 6px; font-size: 14px; background: #f6f8fb; border-left: 4px solid #1f77b4; padding: 6px 10px; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<div class="bar">
+  <button class="main" id="play"></button>
+  <button id="reset">↺ スイッチを切る（はじめから）</button>
+  <span>速さ</span>
+  <div class="speed" id="speed"><button data-v="0.25">ゆっくり</button><button data-v="0.5">ふつう</button><button data-v="1">速い</button></div>
+</div>
+<div class="row">
+  <canvas id="scene"></canvas>
+  <canvas id="graph"></canvas>
+</div>
+<div class="info">
+  <span>時間 <b id="i-t"></b></span>
+  <span id="i-q"></span>
+  <span>流れる電流 <b id="i-i"></b></span>
+</div>
+<div class="step" id="step"></div>
+<script>
+/*__COMMON__*/
+</script>
+<script>
+(function () {
+  "use strict";
+  var P = /*__PARAMS__*/;   // {kind: "RC"|"RL", E, R, final, h, unit, sym, tau_text}
+  var RC = P.kind === "RC", h = P.h, F = P.final, tEnd = h <= 1 ? 5 : 8 * h;   // 時間は τ を単位にする（粗いきざみでは 8 ステップ分）
+  var Nstep = Math.round(tEnd / h), seq = [0];
+  var speedScale = tEnd / 5;   // どのきざみでも、だいたい同じ時間で再生する
+  for (var k = 0; k < Nstep; k++) seq.push((1 - h) * seq[k] + h * F);
+  var t = 0, phase = 0;
+
+  function exact(t) { return F * (1 - Math.exp(-t)); }                    // v または i
+  function current(t) { return RC ? (P.E / P.R) * Math.exp(-t) : exact(t); } // 電流 [A]
+  var Imax = P.E / P.R;
+
+  // 回路のループ上の位置（0〜1）→ 座標
+  function loopPt(L, u) {
+    var per = 2 * (L.w + L.h), d = ((u % 1) + 1) % 1 * per;
+    if (d < L.w) return [L.x + d, L.y];
+    d -= L.w; if (d < L.h) return [L.x + L.w, L.y + d];
+    d -= L.h; if (d < L.w) return [L.x + L.w - d, L.y + L.h];
+    d -= L.w; return [L.x, L.y + L.h - d];
+  }
+
+  var drawScene = AN.canvas("scene", function (ctx, w, H) {
+    var L = { x: 40, y: 50, w: w - 90, h: H - 110 };
+    ctx.strokeStyle = "#333"; ctx.lineWidth = 2;
+    ctx.strokeRect(L.x, L.y, L.w, L.h);
+    function gap(x0, y0, x1, y1) { ctx.save(); ctx.strokeStyle = "#fff"; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); ctx.restore(); }
+    // 電池（左の辺）
+    var by = L.y + L.h / 2; gap(L.x, by - 10, L.x, by + 10);
+    ctx.beginPath(); ctx.moveTo(L.x - 14, by - 8); ctx.lineTo(L.x + 14, by - 8); ctx.stroke();
+    ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(L.x - 7, by + 8); ctx.lineTo(L.x + 7, by + 8); ctx.stroke(); ctx.lineWidth = 2;
+    AN.text(ctx, "E = " + P.E + " V", L.x - 6, by + 32, "#333", "left", "12px sans-serif");
+    // スイッチ（上の辺の左寄り）
+    var sx = L.x + L.w * 0.18; gap(sx, L.y, sx + 30, L.y);
+    var on = t > 0;
+    ctx.beginPath(); ctx.moveTo(sx, L.y); ctx.lineTo(sx + 30, on ? L.y : L.y - 18); ctx.stroke();
+    AN.dot(ctx, sx, L.y, 3, "#333"); AN.dot(ctx, sx + 30, L.y, 3, "#333");
+    AN.text(ctx, on ? "スイッチ ON" : "スイッチ OFF", sx + 15, L.y - 24, on ? "#d62728" : "#666", "center", "12px sans-serif");
+    // 抵抗（上の辺の右寄り）
+    var rx = L.x + L.w * 0.6; gap(rx - 22, L.y, rx + 22, L.y);
+    ctx.fillStyle = "#fff"; ctx.fillRect(rx - 22, L.y - 8, 44, 16); ctx.strokeRect(rx - 22, L.y - 8, 44, 16);
+    AN.text(ctx, "R", rx, L.y - 14, "#1f77b4", "center", "bold 13px sans-serif");
+    // コンデンサ または コイル（右の辺）
+    var cx = L.x + L.w, cy = L.y + L.h / 2, val = Math.max(0, t > 0 ? exact(t) : 0);
+    if (RC) {
+      gap(cx, cy - 8, cx, cy + 8);
+      ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(cx - 20, cy - 8); ctx.lineTo(cx + 20, cy - 8); ctx.moveTo(cx - 20, cy + 8); ctx.lineTo(cx + 20, cy + 8); ctx.stroke(); ctx.lineWidth = 2;
+      var nq = Math.round(val / F * 6);
+      for (var q = 0; q < nq; q++) { AN.text(ctx, "+", cx - 17 + q * 6.5, cy - 12, "#d62728", "left", "bold 11px sans-serif"); AN.text(ctx, "−", cx - 17 + q * 6.5, cy + 21, "#1f77b4", "left", "bold 11px sans-serif"); }
+      AN.text(ctx, "C", cx + 26, cy + 4, "#333", "left", "bold 13px sans-serif");
+      AN.text(ctx, "v = " + val.toFixed(2) + " V", cx - 4, L.y + L.h + 30, "#d62728", "right", "bold 13px sans-serif");
+    } else {
+      gap(cx, cy - 26, cx, cy + 26);
+      ctx.beginPath();
+      for (var j = 0; j < 4; j++) ctx.arc(cx, cy - 19.5 + j * 13, 6.5, -Math.PI / 2, Math.PI / 2, false);
+      ctx.stroke();
+      // 磁界（電流が大きいほど濃く）
+      var a = Math.min(1, current(t) / Imax);
+      ctx.save(); ctx.strokeStyle = "rgba(148,103,189," + (0.85 * a).toFixed(2) + ")"; ctx.setLineDash([3, 3]);
+      for (var m = 1; m <= 2; m++) { ctx.beginPath(); ctx.ellipse(cx, cy, 14 + 10 * m, 32 + 8 * m, 0, 0, 2 * Math.PI); ctx.stroke(); }
+      ctx.restore();
+      AN.text(ctx, "L", cx + 18, cy - 30, "#333", "left", "bold 13px sans-serif");
+      AN.text(ctx, "i = " + val.toPrecision(3) + " A", cx - 4, L.y + L.h + 30, "#d62728", "right", "bold 13px sans-serif");
+    }
+    // 電流の粒（速さ ∝ 電流）
+    if (t > 0) {
+      var I = current(t) / Imax;
+      for (var p = 0; p < 22; p++) {
+        var pt = loopPt(L, p / 22 + phase);
+        AN.dot(ctx, pt[0], pt[1], 2.6, "rgba(255,127,14," + (0.25 + 0.75 * Math.min(1, I * 1.5)).toFixed(2) + ")");
+      }
+    }
+    AN.text(ctx, "オレンジの粒の速さ ＝ 電流の大きさ", 8, H - 8, "#ff7f0e", "left", "11px sans-serif");
+  });
+
+  var drawGraph = AN.canvas("graph", function (ctx, w, H) {   // H：キャンバスの高さ（h はきざみ）
+    var box = { x: 50, y: 24, w: w - 66, h: H - 62 };
+    var ys = seq.concat([F]), lo = Math.min(0, Math.min.apply(null, ys)), hi = Math.max(F * 1.15, Math.max.apply(null, ys) * 1.05);
+    var M = AN.axes(ctx, box, [0, tEnd], [lo, hi], { xticks: AN.ticks(0, tEnd, 6), yticks: AN.ticks(lo, hi, 5), xlabel: "時間（τ の何倍か）", ylabel: P.sym + " [" + P.unit + "]" });
+    ctx.save(); ctx.setLineDash([4, 4]); ctx.strokeStyle = "#2ca02c"; ctx.beginPath(); ctx.moveTo(box.x, M.Y(F)); ctx.lineTo(box.x + box.w, M.Y(F)); ctx.stroke(); ctx.restore();
+    AN.text(ctx, "最終値 " + AN.fmt(F) + " " + P.unit, box.x + box.w - 4, M.Y(F) - 5, "#2ca02c", "right", "11px sans-serif");
+    // 正しい変化（ここまで）
+    var xs = [], vs = [], n = Math.max(2, Math.ceil(t / tEnd * 500));
+    for (var i = 0; i <= n; i++) { var ti = t * i / n; xs.push(ti); vs.push(exact(ti)); }
+    AN.polyline(ctx, M, xs, vs, "#9aa0a6", 3);
+    // 漸化式の点（Δt ごと）
+    var kk = Math.min(Nstep, Math.floor(t / h + 1e-9)), px = [], py = [];
+    for (var k = 0; k <= kk; k++) { px.push(k * h); py.push(seq[k]); }
+    AN.polyline(ctx, M, px, py, "rgba(214,39,40,0.6)", 1.5);
+    for (k = 0; k <= kk; k++) AN.dot(ctx, M.X(k * h), M.Y(seq[k]), 4, "#d62728");
+    AN.text(ctx, "灰色：正しい変化　赤：漸化式（Δt ごと）", box.x + 6, box.y + 14, "#333", "left", "11px sans-serif");
+  });
+
+  function fv(v) { return Math.abs(F) < 0.1 ? v.toPrecision(3) : v.toFixed(3); }
+  function info() {
+    var $ = function (id) { return document.getElementById(id); }, kk = Math.min(Nstep, Math.floor(t / h + 1e-9));
+    $("i-t").textContent = "t = " + t.toFixed(2) + "τ（" + P.tau_text + " × " + t.toFixed(2) + "）";
+    $("i-q").innerHTML = (RC ? "コンデンサの電圧 " : "コイルの電流 ") + "<b>" + fv(exact(t)) + " " + P.unit + "</b>（正しい値）";
+    $("i-i").textContent = (t > 0 ? current(t) : 0).toFixed(4) + " A";
+    if (kk >= 1) {
+      var s = P.sym;
+      $("step").innerHTML = "漸化式の " + kk + " 回目：" + s + "<sub>" + kk + "</sub> = (1 − " + h + ") × " + seq[kk - 1].toFixed(3) + " + " + h + " × " + AN.fmt(F)
+        + " = <b>" + fv(seq[kk]) + "</b>　（正しい値 " + fv(exact(kk * h)) + "）";
+    } else $("step").innerHTML = P.sym + "<sub>0</sub> = 0（スイッチを入れる前）。▶ を押すとスイッチが入ります。";
+  }
+  function draw() { drawScene(); drawGraph(); info(); }
+
+  var sp = AN.speed(document.getElementById("speed"), 0.5);
+  new AN.Player(document.getElementById("play"), function (dt) {
+    if (t >= tEnd) t = 0;
+    t += dt * sp() * speedScale;
+    phase += dt * (t > 0 ? current(t) / Imax : 0) * 0.35;
+    if (t >= tEnd) { t = tEnd; draw(); return false; }
+    draw();
+  });
+  document.getElementById("reset").addEventListener("click", function () { t = 0; draw(); });
+  draw();
+  window.__test = { set: function (v) { t = v; draw(); }, seq: seq, exact: exact };
+})();
+</script>
+</body>
+</html>
