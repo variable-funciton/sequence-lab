@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body { margin: 0; font-family: "Source Sans Pro", "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif; color: #262730; background: #fff; }
+.bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 4px 0 8px; }
+button { font: inherit; padding: 5px 14px; border: 1px solid #d0d3da; border-radius: 8px; background: #fff; cursor: pointer; }
+button.main { background: #ff4b4b; color: #fff; border-color: #ff4b4b; }
+.speed { display: inline-flex; border: 1px solid #d0d3da; border-radius: 8px; overflow: hidden; }
+.speed button { border: 0; border-radius: 0; padding: 5px 10px; }
+.speed button.on { background: #1f77b4; color: #fff; }
+label { font-size: 14px; display: inline-flex; gap: 4px; align-items: center; }
+canvas { width: 100%; height: 300px; display: block; border: 1px solid #eee; border-radius: 8px; }
+table { border-collapse: collapse; margin-top: 8px; font-size: 14px; font-variant-numeric: tabular-nums; }
+th, td { padding: 3px 10px; border-bottom: 1px solid #eee; text-align: right; }
+th:first-child, td:first-child { text-align: left; }
+.c0 { color: #1f77b4; font-weight: 600; } .c1 { color: #d62728; font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="bar">
+  <button class="main" id="play"></button>
+  <button id="reset">↺ はじめから</button>
+  <span>速さ</span>
+  <div class="speed" id="speed"><button data-v="0.25">1/4</button><button data-v="0.5">1/2</button><button data-v="1">実際の速さ</button></div>
+  <label><input type="checkbox" id="ghost" checked> 軌道の全体をうすく表示</label>
+  <label><input type="checkbox" id="vec" checked> 速度の矢印</label>
+</div>
+<canvas id="scene"></canvas>
+<table>
+  <tr><th></th><th>時刻</th><th>x [m]</th><th>高さ y [m]</th><th>速さ [m/s]</th><th>飛距離</th><th>最高点</th><th>滞空時間</th></tr>
+  <tr><td class="c0">空気抵抗なし</td><td id="t0"></td><td id="x0"></td><td id="y0"></td><td id="v0"></td><td id="r0"></td><td id="h0"></td><td id="T0"></td></tr>
+  <tr><td class="c1" id="name1"></td><td id="t1"></td><td id="x1"></td><td id="y1"></td><td id="v1"></td><td id="r1"></td><td id="h1"></td><td id="T1"></td></tr>
+</table>
+<script>
+/*__COMMON__*/
+</script>
+<script>
+(function () {
+  "use strict";
+  var P = /*__PARAMS__*/;   // {v0, deg, k, label, dt}
+  var g = 9.8, dt = P.dt || 0.002;
+
+  /** 漸化式（オイラー法）で軌道を計算：utils/applied.py の projectile_drag と同じ */
+  function simulate(k) {
+    var th = P.deg * Math.PI / 180, x = 0, y = 0, vx = P.v0 * Math.cos(th), vy = P.v0 * Math.sin(th), t = 0;
+    var out = [{ t: 0, x: 0, y: 0, vx: vx, vy: vy }];
+    while (t < 120) {
+      var sp = Math.hypot(vx, vy), nx = x + vx * dt, ny = y + vy * dt;
+      var nvx = vx - k * sp * vx * dt, nvy = vy - (g + k * sp * vy) * dt;
+      t += dt;
+      if (ny < 0) { var f = y / (y - ny); out.push({ t: t - dt + f * dt, x: x + f * (nx - x), y: 0, vx: nvx, vy: nvy }); break; }
+      x = nx; y = ny; vx = nvx; vy = nvy;
+      out.push({ t: t, x: x, y: y, vx: vx, vy: vy });
+    }
+    return out;
+  }
+  var paths = [simulate(0), simulate(P.k)];
+  var stats = paths.map(function (p) {
+    var top = p.reduce(function (a, b) { return b.y > a.y ? b : a; });
+    return { range: p[p.length - 1].x, height: top.y, time: p[p.length - 1].t };
+  });
+  var tEnd = Math.max(stats[0].time, stats[1].time), t = 0;
+  var COL = ["#1f77b4", "#d62728"];
+
+  function at(p, t) {
+    if (t >= p[p.length - 1].t) return p[p.length - 1];
+    var i = Math.min(p.length - 2, Math.floor(t / dt)), a = p[i], b = p[i + 1], f = (t - a.t) / (b.t - a.t);
+    return { t: t, x: a.x + f * (b.x - a.x), y: a.y + f * (b.y - a.y), vx: a.vx + f * (b.vx - a.vx), vy: a.vy + f * (b.vy - a.vy) };
+  }
+
+  // キャンバスの高さを、縦横同じ縮尺の軌道がちょうど入る高さにする
+  function fit() {
+    var c = document.getElementById("scene"), XR = Math.max(stats[0].range, stats[1].range) * 1.05, YR = Math.max(stats[0].height, stats[1].height) * 1.2;
+    c.style.height = Math.round(Math.max(220, Math.min(440, (c.clientWidth - 60) * YR / XR + 58))) + "px";
+  }
+  fit();
+  window.addEventListener("resize", fit);
+  var draw = AN.canvas("scene", function (ctx, w, h) {
+    var XR = Math.max(stats[0].range, stats[1].range) * 1.05, YR = Math.max(stats[0].height, stats[1].height) * 1.2;
+    var pad = { l: 46, r: 14, t: 18, b: 40 }, W = w - pad.l - pad.r, H = h - pad.t - pad.b;
+    var s = Math.min(W / XR, H / YR);                       // 縦と横を同じ縮尺にする（本当の形）
+    var box = { x: pad.l, y: pad.t + H - YR * s, w: XR * s, h: YR * s };
+    var M = AN.axes(ctx, box, [0, XR], [0, YR], { xticks: AN.ticks(0, XR, 8), yticks: AN.ticks(0, YR, 4), xlabel: "水平距離 x [m]", ylabel: "高さ [m]" });
+    ctx.fillStyle = "#8d6e63"; ctx.fillRect(box.x, box.y + box.h, box.w, 4);
+    var ghost = document.getElementById("ghost").checked, vec = document.getElementById("vec").checked;
+    paths.forEach(function (p, j) {
+      if (ghost) AN.polyline(ctx, M, p.map(function (q) { return q.x; }), p.map(function (q) { return q.y; }), j ? "rgba(214,39,40,0.25)" : "rgba(31,119,180,0.25)", 1.5, [5, 4]);
+      var n = Math.min(p.length - 1, Math.floor(t / dt) + 1), xs = [], ys = [];
+      for (var i = 0; i <= n; i += Math.max(1, Math.floor(n / 600))) { xs.push(p[i].x); ys.push(p[i].y); }
+      var q = at(p, t); xs.push(q.x); ys.push(q.y);
+      AN.polyline(ctx, M, xs, ys, COL[j], 2.5);
+      // 一定時間ごとの印（間隔が等しいかどうかで速さがわかる）
+      var mark = Math.max(0.1, Math.round(tEnd / 20 * 10) / 10);
+      for (var tm = mark; tm <= Math.min(t, p[p.length - 1].t); tm += mark) { var r = at(p, tm); AN.dot(ctx, M.X(r.x), M.Y(r.y), 2.6, COL[j]); }
+      AN.dot(ctx, M.X(q.x), M.Y(q.y), 7, COL[j]);
+      if (vec && t < p[p.length - 1].t) {
+        var sc = 18 / P.v0 * 3;
+        ctx.save(); ctx.strokeStyle = COL[j]; ctx.lineWidth = 2;
+        var x1 = M.X(q.x) + q.vx * sc, y1 = M.Y(q.y) - q.vy * sc;
+        ctx.beginPath(); ctx.moveTo(M.X(q.x), M.Y(q.y)); ctx.lineTo(x1, y1); ctx.stroke();
+        var a = Math.atan2(y1 - M.Y(q.y), x1 - M.X(q.x));
+        ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - 8 * Math.cos(a - 0.4), y1 - 8 * Math.sin(a - 0.4)); ctx.lineTo(x1 - 8 * Math.cos(a + 0.4), y1 - 8 * Math.sin(a + 0.4)); ctx.closePath(); ctx.fillStyle = COL[j]; ctx.fill();
+        ctx.restore();
+      }
+    });
+    AN.text(ctx, "点は " + (Math.max(0.1, Math.round(tEnd / 20 * 10) / 10)).toFixed(1) + " 秒ごとの位置", box.x + box.w - 4, box.y + 14, "#555", "right", "11px sans-serif");
+  });
+
+  function table() {
+    var f = function (v, d) { return v.toFixed(d === undefined ? 1 : d); };
+    [0, 1].forEach(function (j) {
+      var p = paths[j], q = at(p, t), st = stats[j], $ = function (id) { return document.getElementById(id + j); };
+      $("t").textContent = f(Math.min(t, st.time), 2) + " 秒"; $("x").textContent = f(q.x); $("y").textContent = f(q.y);
+      $("v").textContent = f(Math.hypot(q.vx, q.vy)); $("r").textContent = f(st.range) + " m"; $("h").textContent = f(st.height) + " m"; $("T").textContent = f(st.time, 2) + " 秒";
+    });
+    document.getElementById("name1").textContent = P.label;
+  }
+  function redraw() { draw(); table(); }
+
+  var sp = AN.speed(document.getElementById("speed"), 0.5);
+  new AN.Player(document.getElementById("play"), function (d) {
+    if (t >= tEnd) t = 0;
+    t += d * sp();
+    if (t >= tEnd) { t = tEnd; redraw(); return false; }
+    redraw();
+  });
+  document.getElementById("reset").addEventListener("click", function () { t = 0; redraw(); });
+  ["ghost", "vec"].forEach(function (id) { document.getElementById(id).addEventListener("change", redraw); });
+  redraw();
+  window.__test = { set: function (v) { t = v; redraw(); }, stats: stats };
+})();
+</script>
+</body>
+</html>
