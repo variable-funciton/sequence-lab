@@ -3,9 +3,9 @@
 import math
 
 import pandas as pd
-import plotly.graph_objects as go
 import streamlit as st
 
+from utils.anim import render as render_anim
 from utils.applied import exact_charge, linear_closed_form, linear_recurrence
 
 CIRCUITS = {
@@ -28,7 +28,7 @@ else:
     tau = L / R
     final, unit, sym = E / R, "A", "i"
 h = st.sidebar.select_slider("時間のきざみ h = Δt / τ", options=[0.05, 0.1, 0.2, 0.5, 1.0, 1.5, 1.9, 2.1, 2.5], key="tr_h")
-t_end = 5.0  # τ の何倍まで
+t_end = 5.0 if h <= 1 else 8 * h  # τ の何倍まで（きざみが粗いときは 8 ステップ分）
 
 N = int(round(t_end / h))
 xs = linear_recurrence(0.0, 1 - h, h * final, N)
@@ -56,20 +56,12 @@ m[0].metric("時定数 τ", f"{tau * 1000:.4g} ms" if tau < 1 else f"{tau:.4g} s
 m[1].metric("きざみ Δt", f"{dt * 1000:.4g} ms" if dt < 1 else f"{dt:.4g} s")
 m[2].metric("公比 1 − h", f"{1 - h:g}")
 exact_end = final * (1 - math.exp(-t_end))
-m[3].metric(f"5τ 後の値（漸化式）", f"{xs[-1]:.4g} {unit}", delta=f"正しい値 {exact_end:.4g} {unit}", delta_color="off")
+m[3].metric(f"{t_end:g}τ 後の値（漸化式）", f"{xs[-1]:.4g} {unit}", delta=f"正しい値 {exact_end:.4g} {unit}", delta_color="off")
 
-tt = [t_end * i / 300 for i in range(301)]
-fig = go.Figure()
-fig.add_trace(go.Scatter(x=tt, y=[final * (1 - math.exp(-t)) for t in tt], mode="lines", name="正しい変化（微分方程式の解）",
-                         line=dict(color="#9aa0a6", width=3)))
-fig.add_trace(go.Scatter(x=[n * h for n in range(N + 1)], y=xs, mode="lines+markers", name=f"漸化式（h = {h:g}）",
-                         line=dict(color="#d62728", width=2), marker=dict(size=7)))
-fig.add_hline(y=final, line_dash="dot", line_color="#2ca02c", annotation_text=f"最終値 {final:.4g} {unit}")
-ymax = max(max(xs), final) * 1.15
-ymin = min(0, min(xs)) * 1.15
-fig.update_layout(height=400, template="plotly_white", margin=dict(l=10, r=10, t=30, b=10), legend=dict(orientation="h", y=1.08),
-                  xaxis=dict(title="時間（τ の何倍か）"), yaxis=dict(title=f"{sym} [{unit}]", range=[ymin, ymax]))
-st.plotly_chart(fig, key="tr_chart")
+st.markdown("**アニメーション**　▶ を押すとスイッチが入り、電流（オレンジの粒）が流れはじめます。"
+            "右のグラフには、正しい変化（灰色）と、漸化式で Δt ごとに計算した値（赤）がかかれていきます。")
+render_anim("transient", dict(kind=kind, E=E, R=R, final=final, h=h, unit=unit, sym=sym,
+                              tau_text=(f"{tau * 1000:.4g} ms" if tau < 1 else f"{tau:.4g} s")), height=480)
 
 if h < 1:
     st.success(f"0 < 1 − h < 1 なので、(1 − h)ⁿ → 0。値は最終値 {final:.4g} {unit} に近づく（h が小さいほど正しい変化に近い）。")

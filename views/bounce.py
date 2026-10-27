@@ -8,7 +8,8 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from utils.applied import G, bounce_heights, bounce_path, bounce_total_distance, bounce_total_time
+from utils.anim import render as render_anim
+from utils.applied import G, bounce_heights, bounce_total_distance, bounce_total_time
 
 PRESETS = {
     "自由に設定": None,
@@ -57,25 +58,8 @@ m[1].metric(f"{N} 回目の高さ", f"{hs[N]:.3g} m")
 m[2].metric("止まるまでの道のり", f"{D_inf:.3g} m", delta=f"{N} 回までで {D_N:.3g} m", delta_color="off")
 m[3].metric("止まるまでの時間", f"{T_inf:.3g} 秒", delta=f"{N} 回までで {T_N:.3g} 秒", delta_color="off")
 
-ts, ys = bounce_path(h0, e, N)
-fig = go.Figure()
-fig.add_trace(go.Scatter(x=ts, y=ys, mode="lines", name="ボールの高さ", line=dict(color="#1f77b4", width=2.5),
-                         hovertemplate="%{x:.2f} 秒：%{y:.3f} m<extra></extra>"))
-t_top = []
-t0 = (2 * h0 / G) ** 0.5
-T = t0
-for n in range(1, N + 1):
-    half = t0 * e ** n
-    t_top.append(T + half)
-    T += 2 * half
-fig.add_trace(go.Scatter(x=t_top, y=hs[1:], mode="markers+text", name="はね返った高さ h_n",
-                         marker=dict(color="#d62728", size=9), text=[f"h{n}" for n in range(1, N + 1)] if N <= 10 else None,
-                         textposition="top center", hovertemplate="%{y:.3f} m<extra>h_n</extra>"))
-fig.add_vline(x=T_inf, line_dash="dash", line_color="#2ca02c",
-              annotation_text=f"止まる時刻 {T_inf:.2f} 秒", annotation_position="top left")
-fig.update_layout(height=380, template="plotly_white", margin=dict(l=10, r=10, t=30, b=10), showlegend=False,
-                  xaxis=dict(title="時刻 [秒]", range=[0, max(T_inf, ts[-1]) * 1.03]), yaxis=dict(title="高さ [m]", rangemode="tozero"))
-st.plotly_chart(fig, key="bo_path")
+st.markdown("**アニメーション**　▶ を押すとボールが落ちてはね返ります（右のグラフに高さの変化がかかれていきます）。")
+render_anim("bounce", dict(h0=h0, e=e, g=G), height=470)
 
 # 部分和の収束
 ns = list(range(0, 31))

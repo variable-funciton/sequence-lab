@@ -4,9 +4,9 @@ import math
 
 import plotly.graph_objects as go
 import streamlit as st
-from plotly.subplots import make_subplots
 
-from utils.applied import friction_curve, friction_peaks, log_decrement, periods_below, viscous_curve, viscous_peaks
+from utils.anim import render as render_anim
+from utils.applied import friction_peaks, log_decrement, periods_below, viscous_peaks
 
 MODES = {"viscous": "空気や油の抵抗（速さに比例する抵抗）", "friction": "床との摩擦（大きさが一定の摩擦力）"}
 for k, v in dict(dm_mode="viscous", dm_A0=10.0, dm_r=0.8, dm_d=1.5, dm_N=10).items():
@@ -30,7 +30,6 @@ st.markdown(
 
 if mode == "viscous":
     peaks = viscous_peaks(A0, r, N)
-    ts, xs = viscous_curve(A0, r, T, N)
     with st.container(border=True):
         st.markdown("**速さに比例する抵抗**（空気・油・ダンパー）：毎周期、振幅が同じ **割合** で減る → **等比数列**")
         st.latex(rf"A_n = A_0 r^n = {A0:g}\times {r:g}^{{\,n}},\qquad \text{{対数減衰率}}\ \delta = \log_e\frac{{A_n}}{{A_{{n+1}}}} = -\log_e r \approx {log_decrement(r):.3f}")
@@ -43,7 +42,6 @@ if mode == "viscous":
     st.caption("等比数列なので、何周期たっても振幅は 0 にはならない（どこまでも小さくなっていく）。")
 else:
     peaks = friction_peaks(A0, d, N)
-    ts, xs = friction_curve(A0, d, T, N)
     with st.container(border=True):
         st.markdown("**大きさが一定の摩擦力**：毎周期、振幅が同じ **量** だけ減る → **等差数列**")
         st.latex(rf"A_n = A_0 - nd = {A0:g} - {d:g}\,n")
@@ -54,19 +52,14 @@ else:
     m[2].metric("止まるまで", f"約 {stop} 周期" if stop else "—")
     st.caption("等差数列なので、有限の時間で振幅が 0 になる（摩擦でぴたりと止まる）。")
 
-fig = make_subplots(rows=1, cols=2, column_widths=[0.65, 0.35], subplot_titles=("おもりの位置 x(t)", "各周期の振幅 Aₙ"))
-fig.add_trace(go.Scatter(x=ts, y=xs, mode="lines", line=dict(color="#1f77b4", width=2), name="x(t)",
-                         hovertemplate="t = %{x:.2f}：%{y:.3f} mm<extra></extra>"), row=1, col=1)
-fig.add_trace(go.Scatter(x=list(range(N + 1)), y=peaks, mode="markers", marker=dict(color="#d62728", size=8), name="山 Aₙ",
-                         hovertemplate="%{x} 周期後：%{y:.3f} mm<extra></extra>"), row=1, col=1)
-env = [A0 * r ** t for t in ts] if mode == "viscous" else [max(0.0, A0 - d * t) for t in ts]
-fig.add_trace(go.Scatter(x=ts, y=env, mode="lines", line=dict(color="#d62728", dash="dot", width=1.5), name="包絡線"), row=1, col=1)
-fig.add_trace(go.Bar(x=list(range(N + 1)), y=peaks, marker_color="#d62728", name="Aₙ",
-                     hovertemplate="n = %{x}：%{y:.3f} mm<extra></extra>"), row=1, col=2)
-fig.update_xaxes(title_text="時間（周期）", row=1, col=1)
-fig.update_xaxes(title_text="n", row=1, col=2)
-fig.update_yaxes(title_text="mm", row=1, col=1)
-fig.update_layout(height=400, template="plotly_white", showlegend=False, margin=dict(l=10, r=10, t=40, b=10))
+st.markdown("**アニメーション**　▶ を押すと、ばねにつけたおもりが振動します（下のグラフに位置がかかれ、各周期の山 Aₙ に印がつきます）。")
+render_anim("damping", dict(mode=mode, A0=A0, r=r if mode == "viscous" else 0.0, d=d if mode == "friction" else 0.0, N=N), height=540)
+
+fig = go.Figure(go.Bar(x=list(range(N + 1)), y=peaks, marker_color="#d62728",
+                       hovertemplate="n = %{x}：%{y:.3f} mm<extra></extra>"))
+fig.update_layout(height=300, template="plotly_white", showlegend=False, margin=dict(l=10, r=10, t=40, b=10),
+                  title=dict(text="各周期の振幅 Aₙ（" + ("等比数列" if mode == "viscous" else "等差数列") + "）", x=0.5, xanchor="center"),
+                  xaxis=dict(title="n", dtick=1 if N <= 15 else 5), yaxis=dict(title="mm", rangemode="tozero"))
 st.plotly_chart(fig, key="dm_chart")
 
 with st.expander("📖 解説：等比になる理由・等差になる理由"):
