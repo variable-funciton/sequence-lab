@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body { margin: 0; font-family: "Source Sans Pro", "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif; color: #262730; background: #fff; }
+.bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 4px 0 8px; }
+button { font: inherit; padding: 5px 14px; border: 1px solid #d0d3da; border-radius: 8px; background: #fff; cursor: pointer; }
+button.main { background: #ff4b4b; color: #fff; border-color: #ff4b4b; }
+.speed { display: inline-flex; border: 1px solid #d0d3da; border-radius: 8px; overflow: hidden; }
+.speed button { border: 0; border-radius: 0; padding: 5px 10px; }
+.speed button.on { background: #1f77b4; color: #fff; }
+.row { display: grid; grid-template-columns: minmax(150px, 0.32fr) minmax(0, 1fr); gap: 10px; }
+@media (max-width: 640px) { .row { grid-template-columns: 1fr; } #scene { height: 260px; } }
+canvas { width: 100%; height: 340px; display: block; border: 1px solid #eee; border-radius: 8px; }
+.info { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 8px; font-size: 14px; }
+.info b { color: #d62728; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<div class="bar">
+  <button class="main" id="play"></button>
+  <button id="reset">↺ はじめから</button>
+  <span>速さ</span>
+  <div class="speed" id="speed"><button data-v="0.25">1/4</button><button data-v="0.5">1/2</button><button data-v="1">実際の速さ</button></div>
+</div>
+<div class="row">
+  <canvas id="scene"></canvas>
+  <canvas id="graph"></canvas>
+</div>
+<div class="info">
+  <span>時刻 <b id="i-t"></b></span>
+  <span>はね返った回数 <b id="i-n"></b></span>
+  <span>直前にはね返った高さ <b id="i-h"></b></span>
+  <span>ここまでの道のり <b id="i-d"></b></span>
+</div>
+<script>
+/*__COMMON__*/
+</script>
+<script>
+(function () {
+  "use strict";
+  var P = /*__PARAMS__*/;          // {h0, e, g}
+  var h0 = P.h0, e = P.e, g = P.g || 9.8;
+  var t0 = Math.sqrt(2 * h0 / g), Tinf = t0 * (1 + e) / (1 - e), Linf = h0 * (1 + e * e) / (1 - e * e);
+  // 着地の時刻 land[k]（k = 0 が最初の着地）と、k 回目にはね返ったときの速さ
+  var land = [t0], vs = [0], dist = [h0];      // dist[k]：k 回目の着地までの道のり
+  for (var k = 1; k < 400; k++) {
+    var v = g * t0 * Math.pow(e, k);
+    if (v * v / (2 * g) < h0 * 1e-7) break;
+    vs.push(v); land.push(land[k - 1] + 2 * v / g); dist.push(dist[k - 1] + v * v / g);
+  }
+  var t = 0;
+
+  /** 時刻 t の高さ・はね返った回数・道のり */
+  function state(t) {
+    if (t <= t0) return { y: h0 - 0.5 * g * t * t, n: 0, d: 0.5 * g * t * t };
+    for (var k = 1; k < land.length; k++) {
+      if (t <= land[k]) {
+        var tau = t - land[k - 1], v = vs[k], y = v * tau - 0.5 * g * tau * tau, top = v * v / (2 * g);
+        var d = dist[k - 1] + (tau <= v / g ? y : top + (top - y));
+        return { y: Math.max(0, y), n: k, d: d };
+      }
+    }
+    return { y: 0, n: land.length - 1, d: Linf, stopped: true };
+  }
+
+  var R = 9;
+  var drawScene = AN.canvas("scene", function (ctx, w, h) {
+    var top = 24, bottom = h - 26, Y = function (y) { return bottom - R - y / h0 * (bottom - R - top); };
+    // 目盛
+    AN.text(ctx, "高さ [m]", 6, 14, "#333");
+    AN.ticks(0, h0, 4).forEach(function (v) { ctx.strokeStyle = "#eee"; ctx.beginPath(); ctx.moveTo(34, Y(v) + R); ctx.lineTo(w - 6, Y(v) + R); ctx.stroke(); AN.text(ctx, AN.fmt(v), 30, Y(v) + R + 4, "#666", "right", "11px sans-serif"); });
+    // はね返る高さ h_n（点線）
+    var s = state(t);
+    ctx.save(); ctx.setLineDash([4, 4]); ctx.strokeStyle = "#d62728";
+    for (var k = 1; k <= Math.min(s.n, 8); k++) {
+      var hk = h0 * Math.pow(e, 2 * k), yy = Y(hk) + R;
+      ctx.beginPath(); ctx.moveTo(40, yy); ctx.lineTo(w - 8, yy); ctx.stroke();
+      AN.text(ctx, "h" + k, w - 8, yy - 3, "#d62728", "right", "11px sans-serif");
+    }
+    ctx.restore();
+    // 床
+    ctx.fillStyle = "#8d6e63"; ctx.fillRect(34, bottom, w - 40, 6);
+    // ボール
+    var bx = 34 + (w - 40) / 2;
+    ctx.save(); ctx.fillStyle = "#1f77b4"; ctx.beginPath(); ctx.arc(bx, Y(s.y), R, 0, 2 * Math.PI); ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.6)"; ctx.beginPath(); ctx.arc(bx - 3, Y(s.y) - 3, 3, 0, 2 * Math.PI); ctx.fill(); ctx.restore();
+  });
+
+  var drawGraph = AN.canvas("graph", function (ctx, w, h) {
+    var box = { x: 44, y: 22, w: w - 60, h: h - 60 };
+    var M = AN.axes(ctx, box, [0, Tinf * 1.08], [0, h0 * 1.08], { xticks: AN.ticks(0, Tinf * 1.08, 6), yticks: AN.ticks(0, h0, 4), xlabel: "時刻 [秒]", ylabel: "高さ [m]" });
+    // 止まる時刻
+    ctx.save(); ctx.setLineDash([5, 4]); ctx.strokeStyle = "#2ca02c"; ctx.beginPath(); ctx.moveTo(M.X(Tinf), box.y); ctx.lineTo(M.X(Tinf), box.y + box.h); ctx.stroke(); ctx.restore();
+    AN.text(ctx, "止まる時刻 " + Tinf.toFixed(2) + " 秒", M.X(Tinf) - 4, box.y + 12, "#2ca02c", "right");
+    // ここまでの軌跡
+    var xs = [], ys = [], n = Math.max(2, Math.ceil(Math.min(t, Tinf) / Tinf * 900));
+    for (var i = 0; i <= n; i++) { var tt = Math.min(t, Tinf) * i / n; xs.push(tt); ys.push(state(tt).y); }
+    AN.polyline(ctx, M, xs, ys, "#1f77b4", 2.2);
+    // 山（h_n）
+    for (var k = 1; k < land.length && land[k - 1] + vs[k] / g <= t; k++) {
+      AN.dot(ctx, M.X(land[k - 1] + vs[k] / g), M.Y(vs[k] * vs[k] / (2 * g)), 3.5, "#d62728");
+    }
+    var s = state(t);
+    AN.dot(ctx, M.X(Math.min(t, Tinf)), M.Y(s.y), 5, "#1f77b4");
+  });
+
+  function info() {
+    var s = state(t), $ = function (id) { return document.getElementById(id); };
+    $("i-t").textContent = Math.min(t, Tinf).toFixed(2) + " 秒" + (s.stopped ? "（止まった）" : "");
+    $("i-n").textContent = s.stopped ? "無限回（理論上）" : s.n + " 回";
+    $("i-h").textContent = s.n ? (h0 * Math.pow(e, 2 * s.n)).toPrecision(3) + " m（h" + s.n + " = h0 × " + (e * e).toFixed(3) + "^" + s.n + "）" : "—";
+    $("i-d").textContent = s.d.toFixed(3) + " m　（止まるまでで " + Linf.toFixed(3) + " m）";
+  }
+  function draw() { drawScene(); drawGraph(); info(); }
+
+  var sp = AN.speed(document.getElementById("speed"), 0.5);
+  var player = new AN.Player(document.getElementById("play"), function (dt) {
+    if (t > Tinf) t = 0;               // 最後まで再生したあとは、はじめから
+    t += dt * sp();
+    if (t >= Tinf) { t = Tinf + 1e-9; draw(); return false; }
+    draw();
+  });
+  document.getElementById("reset").addEventListener("click", function () { t = 0; draw(); });
+  draw();
+  window.__test = { state: state, set: function (x) { t = x; draw(); }, Tinf: Tinf, Linf: Linf, land: land };
+})();
+</script>
+</body>
+</html>
