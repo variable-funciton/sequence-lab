@@ -19,6 +19,7 @@ Streamlit Community Cloud で公開する、数列の学習用 Web アプリで�
 
 | 分野 | ページ | 内容 | 使う数列 |
 |---|---|---|---|
+| プログラミング | ニュートン法 | √a の漸化式（長方形が正方形に近づくアニメーション、正しい桁を色分けした 40 桁の表）、相加相乗平均と誤差の式 e_{n+1} = e_n²/(2x_n)、二分法との比較（誤差の対数グラフ）、接線で考えるニュートン法（接線のアニメーション、行ったり来たりする例）、割り算を使わない 1/a、Python のプログラム例 | 非線形の漸化式・2 次収束 |
 | 物理 | 空気抵抗のある斜方投射 | 抵抗なし（青）と抵抗あり（赤）を同時に投げるアニメーション、漸化式（オイラー法）での計算、角度と飛距離のグラフ（最もよく飛ぶ角度は 45° より小さい）、終端速度 | 漸化式 |
 | 物理 | ボールの跳ね返り | 落ちてはね返るアニメーションと高さのグラフ。反発係数 e。高さ h₀e²ⁿ、止まるまでの道のり・時間（無限等比級数）、高さと時刻のグラフ | 等比数列・無限等比級数 |
 | 機械 | 標準数（ルナール数列） | R5〜R40 と理論値 10^(k/n)、最も近い標準数、対数目盛 | 等比数列 |
@@ -47,7 +48,8 @@ utils/level_payment.py 月次ローンの計算クラス（旧 LevelPayment.py �
 utils/applied.py       物理・各学科への応用ページの計算（Streamlit に依存しない）
 utils/anim.py          ブラウザで動くアニメーション（assets/*.html）をページに埋め込む
 utils/series.py        いろいろな数列の和（部分和・バーゼル問題）
-assets/                アニメーション（bounce・damping・transient・projectile の .html と共通部品 anim_common.js）
+utils/newton.py        ニュートン法・二分法（桁数の多い小数 Decimal で計算）
+assets/                アニメーション（bounce・damping・transient・projectile・newton_rect・newton_tangent の .html と共通部品 anim_common.js）
                        生徒のブラウザの中で動くので、全員が同時に再生してもサーバーに負荷がかからない
 tests/test_sequences.py 課題9・10・12 の数値で検証するテスト
 tests/test_applied.py  応用ページの計算のテスト（国税庁の減価償却の例などで検証）

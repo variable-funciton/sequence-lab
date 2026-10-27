@@ -49,6 +49,9 @@ PAGES = {
         st.Page("views/depreciation.py", title="減価償却（定額法・定率法）", icon="🧾", url_path="depreciation"),
         st.Page("views/saving.py", title="積立と複利", icon="🐷", url_path="saving"),
     ],
+    "プログラミングのための数列": [
+        st.Page("views/newton.py", title="ニュートン法（√2 を求める漸化式）", icon="💻", url_path="newton"),
+    ],
     "実務版": [
         st.Page("views/level_payment.py", title="元利均等返済（月次）", icon="🏦", url_path="level_payment"),
     ],
