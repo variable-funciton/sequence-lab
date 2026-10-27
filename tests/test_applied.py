@@ -131,6 +131,36 @@ def test_business():
     near(savings_closed(savings_payment(1e6, 0.002, 120), 0.002, 120), 1e6)
 
 
+
+
+def test_series():
+    from utils.series import SERIES, basel_bound, harmonic_groups, p_series_partial, partial_sums, pi_from_basel
+    S = partial_sums("harmonic", 11)
+    near(S[9], 7381 / 2520); assert S[9] < 3 < S[10]
+    near(partial_sums("telescope", 99)[-1], 1 - 1 / 100)
+    near(partial_sums("geometric", 10)[-1], 1 - 2 ** -10)
+    B = partial_sums("basel", 10 ** 5)
+    assert B[-1] < basel_bound(10 ** 5) and abs(math.pi ** 2 / 6 - B[-1] - 1e-5) < 1e-9
+    assert abs(pi_from_basel(math.pi ** 2 / 6) - math.pi) < 1e-12
+    for i, (a, b, s) in enumerate(harmonic_groups(8)):
+        assert i == 0 or s >= 0.5
+    near(p_series_partial(2, 50)[-1], partial_sums("basel", 50)[-1])
+    for k, v in SERIES.items():
+        if v[3] is not None:
+            assert abs(partial_sums(k, 10 ** 6)[-1] - v[3]) < 2e-6, k
+
+
+def test_projectile_drag():
+    s0 = projectile_summary(20, 45, 0.0)
+    near(s0["range"], 400 / 9.8, 2e-3); near(s0["height"], 100 / 9.8, 2e-3)
+    s1 = projectile_summary(30, 45, 0.0061)
+    assert s1["range"] < projectile_summary(30, 45, 0.0)["range"] and s1["x_top"] > s1["range"] / 2   # 下りが急
+    a, r = best_angle(30, 0.14)
+    assert 25 < a < 40
+    a0, _ = best_angle(30, 0.0)
+    assert abs(a0 - 45) <= 0.5
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_") and callable(fn):
