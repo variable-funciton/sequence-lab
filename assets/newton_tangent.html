@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body { margin: 0; font-family: "Source Sans Pro", "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif; color: #262730; background: #fff; }
+.bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 4px 0 8px; }
+button { font: inherit; padding: 5px 14px; border: 1px solid #d0d3da; border-radius: 8px; background: #fff; cursor: pointer; }
+button.main { background: #ff4b4b; color: #fff; border-color: #ff4b4b; }
+label { font-size: 14px; display: inline-flex; gap: 4px; align-items: center; }
+canvas { width: 100%; height: 380px; display: block; border: 1px solid #eee; border-radius: 8px; }
+.info { margin-top: 8px; font-size: 15px; background: #f6f8fb; border-left: 4px solid #1f77b4; padding: 6px 10px; font-variant-numeric: tabular-nums; }
+.info b { color: #d62728; }
+</style>
+</head>
+<body>
+<div class="bar">
+  <button class="main" id="play"></button>
+  <button id="next">次の 1 回 ▶|</button>
+  <button id="reset">↺ はじめから</button>
+  <label><input type="checkbox" id="zoom"> いまの点のまわりを拡大</label>
+</div>
+<canvas id="scene"></canvas>
+<div class="info" id="info"></div>
+<script>
+/*__COMMON__*/
+</script>
+<script>
+(function () {
+  "use strict";
+  var P = /*__PARAMS__*/;   // {coefs, xs, ftex}
+  var C = P.coefs, xs = P.xs, last = xs.length - 1;
+  var D = C.slice(0, -1).map(function (c, i) { return c * (C.length - 1 - i); });
+  function f(x) { return C.reduce(function (v, c) { return v * x + c; }, 0); }
+  function df(x) { return D.reduce(function (v, c) { return v * x + c; }, 0); }
+  // s：n + (0〜1)。前半で接線をかき、後半で x 軸との交点まで点を動かす
+  var s = 0;
+  var lo = Math.min.apply(null, xs), hi = Math.max.apply(null, xs);
+  var span = Math.max(hi - lo, 1); lo -= span * 0.35; hi += span * 0.35;
+  if (P.range) { lo = Math.min(lo, P.range[0]); hi = Math.max(hi, P.range[1]); }
+
+  var draw = AN.canvas("scene", function (ctx, w, h) {
+    var n = Math.min(last, Math.floor(s + 1e-9)), ph = s - n, x0 = xs[n], x1 = n < last ? xs[n + 1] : x0;
+    var a = lo, b = hi;
+    if (document.getElementById("zoom").checked) { var d = Math.max(Math.abs(x1 - x0) * 2.5, 1e-6); a = Math.min(x0, x1) - d; b = Math.max(x0, x1) + d; }
+    // y の範囲
+    var ys = []; for (var i = 0; i <= 200; i++) ys.push(f(a + (b - a) * i / 200));
+    var ymin = Math.min(0, Math.min.apply(null, ys)), ymax = Math.max(0, Math.max.apply(null, ys)), pad = (ymax - ymin) * 0.1 || 1;
+    var box = { x: 56, y: 20, w: w - 72, h: h - 58 };
+    var M = AN.axes(ctx, box, [a, b], [ymin - pad, ymax + pad], { xticks: AN.ticks(a, b, 8), yticks: AN.ticks(ymin - pad, ymax + pad, 5), xlabel: "x", ylabel: "y = " + P.fplain });
+    ctx.save(); ctx.beginPath(); ctx.rect(box.x, box.y, box.w, box.h); ctx.clip();
+    var px = [], py = []; for (i = 0; i <= 400; i++) { var x = a + (b - a) * i / 400; px.push(x); py.push(f(x)); }
+    AN.polyline(ctx, M, px, py, "#1f77b4", 2.5);
+    // これまでの点
+    for (var k = 0; k < n; k++) AN.dot(ctx, M.X(xs[k]), M.Y(0), 4, "rgba(214,39,40,0.45)");
+    // 縦の点線（x_n → 曲線）
+    ctx.setLineDash([4, 4]); ctx.strokeStyle = "#888"; ctx.beginPath(); ctx.moveTo(M.X(x0), M.Y(0)); ctx.lineTo(M.X(x0), M.Y(f(x0))); ctx.stroke(); ctx.setLineDash([]);
+    if (n < last) {
+      // 接線（前半でのびる）
+      var g = Math.min(1, ph * 2), m = df(x0), ext = (b - a);
+      var ta = x0 - ext * g, tb = x0 + ext * g;
+      ctx.strokeStyle = "#ff7f0e"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(M.X(ta), M.Y(f(x0) + m * (ta - x0))); ctx.lineTo(M.X(tb), M.Y(f(x0) + m * (tb - x0))); ctx.stroke(); ctx.lineWidth = 1;
+      // 交点へ動く点（後半）
+      if (ph > 0.5) { var q = (ph - 0.5) * 2, xm = x0 + (x1 - x0) * q; AN.dot(ctx, M.X(xm), M.Y(f(x0) + m * (xm - x0)), 5, "#ff7f0e"); }
+    }
+    AN.dot(ctx, M.X(x0), M.Y(f(x0)), 6, "#1f77b4");
+    AN.dot(ctx, M.X(x0), M.Y(0), 6, "#d62728");
+    AN.text(ctx, "x" + n, M.X(x0), M.Y(0) + 16, "#d62728", "center", "bold 13px sans-serif");
+    if (n < last && ph > 0.95) { AN.dot(ctx, M.X(x1), M.Y(0), 6, "#d62728"); AN.text(ctx, "x" + (n + 1), M.X(x1), M.Y(0) - 8, "#d62728", "center", "bold 13px sans-serif"); }
+    ctx.restore();
+  });
+
+  function info() {
+    var n = Math.min(last, Math.floor(s + 1e-9)), x = xs[n];
+    var html = "x<sub>" + n + "</sub> = <b>" + x.toPrecision(12) + "</b>、f(x<sub>" + n + "</sub>) = " + f(x).toPrecision(4) + "、接線の傾き f′(x<sub>" + n + "</sub>) = " + df(x).toPrecision(5);
+    if (n < last) html += "<br>接線と x 軸の交点：x<sub>" + (n + 1) + "</sub> = x<sub>" + n + "</sub> − f(x<sub>" + n + "</sub>) ÷ f′(x<sub>" + n + "</sub>) = <b>" + xs[n + 1].toPrecision(12) + "</b>";
+    document.getElementById("info").innerHTML = html;
+  }
+  function redraw() { draw(); info(); }
+
+  var player = new AN.Player(document.getElementById("play"), function (dt) {
+    if (s >= last) s = 0;
+    s += dt * 0.5;
+    if (s >= last) { s = last; redraw(); return false; }
+    redraw();
+  });
+  document.getElementById("next").addEventListener("click", function () {
+    player.stop();
+    var target = Math.min(last, Math.floor(s + 1e-9) + 1), from = s, t0 = null;
+    function anim(ts) { if (t0 === null) t0 = ts; var k = Math.min(1, (ts - t0) / 1400); s = from + (target - from) * k; redraw(); if (k < 1) requestAnimationFrame(anim); }
+    requestAnimationFrame(anim);
+  });
+  document.getElementById("reset").addEventListener("click", function () { player.stop(); s = 0; redraw(); });
+  document.getElementById("zoom").addEventListener("change", redraw);
+  redraw();
+  window.__test = { set: function (v) { s = v; redraw(); } };
+})();
+</script>
+</body>
+</html>
