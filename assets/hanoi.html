@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body { margin: 0; font-family: "Source Sans Pro", "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif; color: #262730; background: #fff; }
+.bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 4px 0 8px; }
+button { font: inherit; padding: 5px 14px; border: 1px solid #d0d3da; border-radius: 8px; background: #fff; cursor: pointer; }
+button.main { background: #ff4b4b; color: #fff; border-color: #ff4b4b; }
+.speed { display: inline-flex; border: 1px solid #d0d3da; border-radius: 8px; overflow: hidden; }
+.speed button { border: 0; border-radius: 0; padding: 5px 10px; }
+.speed button.on { background: #1f77b4; color: #fff; }
+canvas { width: 100%; height: 260px; display: block; border: 1px solid #eee; border-radius: 8px; }
+.info { margin-top: 8px; font-size: 15px; background: #f6f8fb; border-left: 4px solid #1f77b4; padding: 6px 10px; font-variant-numeric: tabular-nums; }
+.info b { color: #d62728; }
+</style>
+</head>
+<body>
+<div class="bar">
+  <button class="main" id="play"></button>
+  <button id="next">1 手進める ▶|</button>
+  <button id="reset">↺ はじめから</button>
+  <span>速さ</span>
+  <div class="speed" id="speed"><button data-v="1">1 手/秒</button><button data-v="3">3 手/秒</button><button data-v="10">10 手/秒</button><button data-v="40">40 手/秒</button></div>
+</div>
+<canvas id="scene"></canvas>
+<div class="info" id="info"></div>
+<script>
+/*__COMMON__*/
+</script>
+<script>
+(function () {
+  "use strict";
+  var P = /*__PARAMS__*/;   // {n}
+  var n = P.n, moves = [];
+  (function solve(k, a, b, c) { if (k === 0) return; solve(k - 1, a, c, b); moves.push([k, a, b]); solve(k - 1, c, b, a); })(n, 0, 2, 1);
+  var total = moves.length, s = 0;        // s：何手目の途中か（実数）
+  var NAMES = ["A", "B", "C"], COLORS = ["#d62728", "#ff7f0e", "#bcbd22", "#2ca02c", "#17becf", "#1f77b4", "#9467bd", "#e377c2", "#8c564b", "#7f7f7f"];
+
+  function pegsAfter(k) {   // k 手終わったときの棒の状態
+    var pegs = [[], [], []];
+    for (var d = n; d >= 1; d--) pegs[0].push(d);
+    for (var i = 0; i < k; i++) { var m = moves[i]; pegs[m[1]].pop(); pegs[m[2]].push(m[0]); }
+    return pegs;
+  }
+
+  var draw = AN.canvas("scene", function (ctx, w, h) {
+    var k = Math.min(total, Math.floor(s + 1e-9)), f = s - k, pegs = pegsAfter(k);
+    var base = h - 30, dh = Math.min(22, (h - 80) / (n + 1)), pegX = [w / 6, w / 2, 5 * w / 6], maxW = w / 3 - 20;
+    ctx.fillStyle = "#8d6e63"; ctx.fillRect(10, base, w - 20, 8);
+    pegX.forEach(function (x, i) {
+      ctx.fillStyle = "#a1887f"; ctx.fillRect(x - 3, base - dh * (n + 1.5), 6, dh * (n + 1.5));
+      AN.text(ctx, NAMES[i], x, base + 24, "#333", "center", "bold 14px sans-serif");
+    });
+    function disk(d, x, y) {
+      var dw = 26 + (maxW - 26) * (d - 1) / Math.max(1, n - 1);
+      ctx.fillStyle = COLORS[(d - 1) % COLORS.length]; ctx.fillRect(x - dw / 2, y - dh + 2, dw, dh - 3);
+      AN.text(ctx, String(d), x, y - dh / 2 + 5, "#fff", "center", "bold 12px sans-serif");
+    }
+    var moving = (k < total && f > 0) ? moves[k] : null;
+    pegs.forEach(function (st, i) {
+      st.forEach(function (d, j) { if (moving && i === moving[1] && j === st.length - 1) return; disk(d, pegX[i], base - dh * j); });
+    });
+    if (moving) {   // 持ち上げる → 横に動かす → 下ろす
+      var from = moving[1], to = moving[2], y0 = base - dh * (pegs[from].length - 1), y1 = base - dh * pegs[to].length, top = base - dh * (n + 2);
+      var x, y;
+      if (f < 1 / 3) { x = pegX[from]; y = y0 + (top - y0) * f * 3; }
+      else if (f < 2 / 3) { x = pegX[from] + (pegX[to] - pegX[from]) * (f - 1 / 3) * 3; y = top; }
+      else { x = pegX[to]; y = top + (y1 - top) * (f - 2 / 3) * 3; }
+      disk(moving[0], x, y);
+    }
+  });
+
+  function info() {
+    var k = Math.min(total, Math.floor(s + 1e-9));
+    var html = "手数 <b>" + k + "</b> / " + total + "（= 2<sup>" + n + "</sup> − 1）";
+    if (k < total) { var m = moves[k]; html += "　次の手：円盤 " + m[0] + " を " + NAMES[m[1]] + " から " + NAMES[m[2]] + " へ"; }
+    else html += "　完成！";
+    if (n >= 2) {
+      var half = Math.pow(2, n - 1) - 1;
+      html += "<br><span style='font-size:13px;color:#555'>しくみ：上の " + (n - 1) + " 枚を B へ（" + half + " 手）→ いちばん大きい円盤 " + n + " を C へ（1 手）→ " + (n - 1) + " 枚を C へ（" + half + " 手）"
+        + (k < half ? "　← いまは 1 つ目" : k === half ? "　← いまは 2 つ目" : "　← いまは 3 つ目") + "</span>";
+    }
+    document.getElementById("info").innerHTML = html;
+  }
+  function redraw() { draw(); info(); }
+
+  var sp = AN.speed(document.getElementById("speed"), 3);
+  var player = new AN.Player(document.getElementById("play"), function (dt) {
+    if (s >= total) s = 0;
+    s += dt * sp();
+    if (s >= total) { s = total; redraw(); return false; }
+    redraw();
+  });
+  document.getElementById("next").addEventListener("click", function () {
+    player.stop();
+    var target = Math.min(total, Math.floor(s + 1e-9) + 1), from = s, t0 = null;
+    function anim(ts) { if (t0 === null) t0 = ts; var q = Math.min(1, (ts - t0) / 500); s = from + (target - from) * q; redraw(); if (q < 1) requestAnimationFrame(anim); }
+    requestAnimationFrame(anim);
+  });
+  document.getElementById("reset").addEventListener("click", function () { player.stop(); s = 0; redraw(); });
+  redraw();
+  window.__test = { set: function (v) { s = v; redraw(); }, total: total };
+})();
+</script>
+</body>
+</html>

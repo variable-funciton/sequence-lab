@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body { margin: 0; font-family: "Source Sans Pro", "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif; color: #262730; background: #fff; }
+.bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 4px 0 8px; }
+button { font: inherit; padding: 5px 14px; border: 1px solid #d0d3da; border-radius: 8px; background: #fff; cursor: pointer; }
+button.main { background: #ff4b4b; color: #fff; border-color: #ff4b4b; }
+.speed { display: inline-flex; border: 1px solid #d0d3da; border-radius: 8px; overflow: hidden; }
+.speed button { border: 0; border-radius: 0; padding: 5px 10px; }
+.speed button.on { background: #1f77b4; color: #fff; }
+.row { display: grid; grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1.2fr); gap: 10px; }
+@media (max-width: 680px) { .row { grid-template-columns: 1fr; } }
+canvas { width: 100%; height: 330px; display: block; border: 1px solid #eee; border-radius: 8px; }
+.info { margin-top: 8px; font-size: 15px; background: #f6f8fb; border-left: 4px solid #1f77b4; padding: 6px 10px; font-variant-numeric: tabular-nums; }
+.info b { color: #d62728; }
+</style>
+</head>
+<body>
+<div class="bar">
+  <button class="main" id="play"></button>
+  <button id="step">1 ステップ ▶|</button>
+  <button id="reset">↺ はじめから</button>
+  <span>速さ</span>
+  <div class="speed" id="speed"><button data-v="2">ゆっくり</button><button data-v="6">ふつう</button><button data-v="20">速い</button></div>
+</div>
+<div class="row">
+  <canvas id="ring"></canvas>
+  <canvas id="st"></canvas>
+</div>
+<div class="info" id="info"></div>
+<script>
+/*__COMMON__*/
+</script>
+<script>
+(function () {
+  "use strict";
+  var P = /*__PARAMS__*/;   // {L, density, vmax, p, seed}
+  var L = P.L, vmax = P.vmax, p = P.p;
+  function rng(seed) { var a = seed >>> 0; return function () { a = (a + 0x6D2B79F5) >>> 0; var t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+  var R, pos, vel, hist, step;
+  function init() {
+    R = rng(P.seed || 1);
+    var n = Math.max(1, Math.min(L, Math.round(L * P.density))), cells = [];
+    for (var i = 0; i < L; i++) cells.push(i);
+    for (i = L - 1; i > 0; i--) { var j = Math.floor(R() * (i + 1)), t = cells[i]; cells[i] = cells[j]; cells[j] = t; }
+    pos = cells.slice(0, n).sort(function (a, b) { return a - b; }); vel = pos.map(function () { return 0; });
+    hist = []; step = 0; record();
+  }
+  function record() { var row = new Int8Array(L).fill(-1); pos.forEach(function (x, i) { row[x] = vel[i]; }); hist.push(row); if (hist.length > 400) hist.shift(); }
+  /** 1 ステップ（加速 → 減速 → ゆらぎ → 移動） */
+  function advance() {
+    var n = pos.length, nv = [];
+    for (var i = 0; i < n; i++) {
+      var gap = n > 1 ? ((pos[(i + 1) % n] - pos[i] - 1) % L + L) % L : L - 1;
+      var v = Math.min(vel[i] + 1, vmax);
+      v = Math.min(v, gap);
+      if (v > 0 && R() < p) v -= 1;
+      nv.push(v);
+    }
+    var np = pos.map(function (x, i) { return (x + nv[i]) % L; }), idx = np.map(function (_, i) { return i; }).sort(function (a, b) { return np[a] - np[b]; });
+    pos = idx.map(function (i) { return np[i]; }); vel = idx.map(function (i) { return nv[i]; });
+    step++; record();
+  }
+  function color(v) { var f = v / vmax; return "rgb(" + Math.round(214 * (1 - f) + 44 * f) + "," + Math.round(39 * (1 - f) + 160 * f) + "," + Math.round(40 * (1 - f) + 44 * f) + ")"; }
+
+  var drawRing = AN.canvas("ring", function (ctx, w, h) {
+    var cx = w / 2, cy = h / 2, r = Math.min(w, h) / 2 - 26;
+    ctx.strokeStyle = "#bbb"; ctx.lineWidth = 18; ctx.beginPath(); ctx.arc(cx, cy, r, 0, 2 * Math.PI); ctx.stroke(); ctx.lineWidth = 1;
+    var cw = 2 * Math.PI / L;
+    pos.forEach(function (x, i) {
+      var a = -Math.PI / 2 + (x + 0.5) * cw;
+      ctx.save(); ctx.translate(cx + r * Math.cos(a), cy + r * Math.sin(a)); ctx.rotate(a + Math.PI / 2);
+      var len = Math.max(3, r * cw * 0.85);
+      ctx.fillStyle = color(vel[i]); ctx.fillRect(-len / 2, -6, len, 12); ctx.restore();
+    });
+    AN.text(ctx, "円形の道路（" + L + " マス）", cx, cy - 6, "#333", "center", "13px sans-serif");
+    AN.text(ctx, "車は時計回り", cx, cy + 12, "#666", "center", "12px sans-serif");
+    AN.text(ctx, "■ 速い", 8, h - 22, "rgb(44,160,44)", "left", "12px sans-serif");
+    AN.text(ctx, "■ 止まっている", 8, h - 6, "rgb(214,39,40)", "left", "12px sans-serif");
+  });
+
+  var drawST = AN.canvas("st", function (ctx, w, h) {
+    var top = 22, left = 10, W = w - 20, H = h - 44, rows = Math.min(hist.length, Math.floor(H / 2)), dy = H / Math.max(rows, Math.floor(H / 2)), dx = W / L;
+    AN.text(ctx, "時空図：横 = 道路の位置、下へ行くほど新しい時刻", left, 14, "#333", "left", "12px sans-serif");
+    for (var r = 0; r < rows; r++) {
+      var row = hist[hist.length - rows + r];
+      for (var x = 0; x < L; x++) if (row[x] >= 0) { ctx.fillStyle = color(row[x]); ctx.fillRect(left + x * dx, top + r * dy, Math.max(1, dx), Math.max(1, dy)); }
+    }
+    ctx.strokeStyle = "#ddd"; ctx.strokeRect(left, top, W, H);
+    AN.text(ctx, "渋滞の帯は、車の進む向きと反対（左下）へ動いていく", left, h - 4, "#d62728", "left", "12px sans-serif");
+  });
+
+  function info() {
+    var n = pos.length, sum = vel.reduce(function (a, b) { return a + b; }, 0), stop = vel.filter(function (v) { return v === 0; }).length;
+    document.getElementById("info").innerHTML = "ステップ <b>" + step + "</b>　車の台数 " + n + "（密度 " + (n / L).toFixed(2) + "）　平均速度 <b>" + (sum / n).toFixed(2)
+      + "</b> マス/ステップ（最高 " + vmax + "）　止まっている車 <b>" + stop + "</b> 台　流量（密度×平均速度） <b>" + (sum / L).toFixed(3) + "</b>";
+  }
+  function redraw() { drawRing(); drawST(); info(); }
+  var acc = 0, sp = AN.speed(document.getElementById("speed"), 6);
+  var player = new AN.Player(document.getElementById("play"), function (dt) { acc += dt * sp(); while (acc >= 1) { advance(); acc -= 1; } redraw(); });
+  document.getElementById("step").addEventListener("click", function () { advance(); redraw(); });
+  document.getElementById("reset").addEventListener("click", function () { player.stop(); init(); redraw(); });
+  init(); redraw();
+  window.__test = { run: function (k) { for (var i = 0; i < k; i++) advance(); redraw(); return vel.reduce(function (a, b) { return a + b; }, 0) / pos.length; } };
+})();
+</script>
+</body>
+</html>
