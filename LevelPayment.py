@@ -44,6 +44,12 @@ PAGES = {
         st.Page("views/population.py", title="人口の変化と将来推計", icon="🏙️", url_path="population"),
         st.Page("views/repair_fund.py", title="マンションの修繕積立金", icon="🏢", url_path="repair_fund"),
         st.Page("views/magnitude.py", title="地震のマグニチュード", icon="🌏", url_path="magnitude"),
+        st.Page("views/traffic.py", title="交通渋滞のセルオートマトン", icon="🚗", url_path="traffic"),
+        st.Page("views/pollution.py", title="環境汚染と自浄作用", icon="🌊", url_path="pollution"),
+    ],
+    "生物・社会のための数列": [
+        st.Page("views/logistic.py", title="ロジスティック写像とカオス", icon="🦋", url_path="logistic"),
+        st.Page("views/sir.py", title="感染症の流行モデル（SIR）", icon="🦠", url_path="sir"),
     ],
     "ビジネスのための数列": [
         st.Page("views/depreciation.py", title="減価償却（定額法・定率法）", icon="🧾", url_path="depreciation"),
@@ -51,6 +57,8 @@ PAGES = {
     ],
     "プログラミングのための数列": [
         st.Page("views/newton.py", title="ニュートン法（√2 を求める漸化式）", icon="💻", url_path="newton"),
+        st.Page("views/hanoi.py", title="ハノイの塔と計算時間", icon="🗼", url_path="hanoi"),
+        st.Page("views/pi_archimedes.py", title="円周率の近似（アルキメデス）", icon="🥧", url_path="pi_archimedes"),
     ],
     "実務版": [
         st.Page("views/level_payment.py", title="元利均等返済（月次）", icon="🏦", url_path="level_payment"),
