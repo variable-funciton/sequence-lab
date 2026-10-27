@@ -178,6 +178,45 @@ def test_newton():
     assert poly_tex([1, 0, -2, -5]) == "x^{3} - 2x - 5"
 
 
+def test_models():
+    import random
+    from utils.models import (archimedes, gauss_legendre, hanoi_counts, hanoi_moves, logistic, nasch_flow, nasch_init,
+                              nasch_step, period_of, pi_digits, pollution, side_doubling, sir)
+    # ハノイの塔：手順が正しく、手数 = 2^n − 1
+    for n in range(1, 9):
+        mv = hanoi_moves(n)
+        assert len(mv) == 2 ** n - 1 == hanoi_counts(n)[-1]
+        pegs = [list(range(n, 0, -1)), [], []]
+        for d, a, b in mv:
+            assert pegs[a][-1] == d and (not pegs[b] or pegs[b][-1] > d)
+            pegs[b].append(pegs[a].pop())
+        assert pegs[2] == list(range(n, 0, -1))
+    # 渋滞：車の台数が変わらず、追い越し・衝突がない。p = 0 で密度が小さければ全員最高速度
+    pos, vel, rng = nasch_init(100, 0.3, 2)
+    for _ in range(200):
+        pos, vel = nasch_step(pos, vel, 100, 5, 0.3, rng)
+        assert len(set(pos)) == len(pos) == 30
+    assert nasch_flow(100, 0.1, 5, 0.0)[0] == 5.0
+    assert nasch_flow(100, 0.5, 5, 0.2)[1] < nasch_flow(100, 0.15, 5, 0.2)[1]
+    # 汚染：定常状態 L/k に近づく、一般項と一致
+    cs = pollution(0, 0.2, 1, 60)
+    near(cs[-1], 5, 1e-4); near(cs[10], 5 * (1 - 0.8 ** 10))
+    # ロジスティック写像
+    assert period_of(2.8) == 1 and period_of(3.2) == 2 and period_of(3.5) == 4 and period_of(3.83) == 3 and period_of(3.7) is None
+    near(logistic(2.8, 0.2, 500)[-1], 1 - 1 / 2.8, 1e-9)
+    # SIR：総人口一定、ピークは S/N ≈ 1/R0
+    S, I, R = sir(100000, 10, 2.5, 1 / 7, 300)
+    assert all(abs(s + i + r - 100000) < 1e-6 for s, i, r in zip(S, I, R))
+    k = max(range(len(I)), key=I.__getitem__)
+    assert abs(S[k] / 100000 - 0.4) < 0.01
+    assert max(sir(100000, 10, 2.5, 1 / 7, 300, 0.5, 0, 300)[1]) < max(I)
+    # 円周率
+    rows = archimedes(4)
+    assert rows[4][0] == 96 and 3 + 10 / 71 < rows[4][1] < math.pi < rows[4][2] < 3 + 1 / 7
+    assert [pi_digits(x) for x in gauss_legendre(5)] == [3, 8, 19, 40, 84]
+    assert abs(side_doubling(30, True)[-1][1] - math.pi) < 1e-14 and side_doubling(30, False)[-1][1] == 0.0
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_") and callable(fn):
