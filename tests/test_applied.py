@@ -259,6 +259,25 @@ def test_convolution():
         near(a, b)
 
 
+def test_markov():
+    import random
+    from utils.markov import closed_form, estimate, generate, limit, parse_weather, probs, run_lengths, temperature
+    ps = probs(0.7, 0.4, 1.0, 10)
+    near(ps[1], 0.7); near(ps[2], 0.61)
+    for n, p in enumerate(ps, start=1):
+        near(p, closed_form(0.7, 0.4, 1.0, n))
+    near(limit(0.7, 0.4), 4 / 7); assert limit(1.0, 0.0) is None
+    s = generate(0.7, 0.4, 0.5, 50000, random.Random(2))
+    assert abs(sum(s) / len(s) - 4 / 7) < 0.01                      # 大数の法則
+    _, a, b = estimate(s)
+    assert abs(a - 0.7) < 0.01 and abs(b - 0.4) < 0.01               # 学習
+    assert parse_weather("晴れ 雨 ☀☔晴") == [1, 0, 1, 0, 1]
+    assert run_lengths([1, 1, 0, 1, 1, 1, 0]) == [2, 3]
+    assert temperature(0.7, 0.5) > 0.7 > temperature(0.7, 2.0) > 0.5
+    rl = run_lengths(generate(0.9, 0.5, 1.0, 50000, random.Random(3)))
+    assert abs(sum(rl) / len(rl) - 10) < 0.6                          # 平均 1/(1 − a)
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_") and callable(fn):
