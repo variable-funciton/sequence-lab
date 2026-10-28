@@ -62,6 +62,9 @@ PAGES = {
         st.Page("views/hanoi.py", title="ハノイの塔と計算時間", icon="🗼", url_path="hanoi"),
         st.Page("views/pi_archimedes.py", title="円周率の近似（アルキメデス）", icon="🥧", url_path="pi_archimedes"),
     ],
+    "情報・AIのための数列": [
+        st.Page("views/markov_ai.py", title="文章生成 AI のミニチュア", icon="🤖", url_path="markov_ai"),
+    ],
     "実務版": [
         st.Page("views/level_payment.py", title="元利均等返済（月次）", icon="🏦", url_path="level_payment"),
     ],
