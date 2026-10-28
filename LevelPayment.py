@@ -16,6 +16,7 @@ PAGES = {
         st.Page("views/arithmetic.py", title="等差数列とその和", icon="📶", url_path="arithmetic"),
         st.Page("views/geometric.py", title="等比数列とその和", icon="✖️", url_path="geometric"),
         st.Page("views/series.py", title="いろいろな数列の和（収束・発散）", icon="♾️", url_path="series"),
+        st.Page("views/dot_convolution.py", title="数列の内積と畳み込み", icon="✳️", url_path="dot_convolution"),
         st.Page("views/interest.py", title="単利と複利（等差・等比）", icon="💹", url_path="interest"),
         st.Page("views/recurrence_loan.py", title="漸化式で見るローン返済", icon="🔁", url_path="recurrence_loan"),
 
