@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body { margin: 0; font-family: "Source Sans Pro", "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif; color: #262730; background: #fff; }
+.bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 4px 0 8px; }
+button { font: inherit; padding: 5px 14px; border: 1px solid #d0d3da; border-radius: 8px; background: #fff; cursor: pointer; }
+button.main { background: #ff4b4b; color: #fff; border-color: #ff4b4b; }
+canvas { width: 100%; height: 420px; display: block; border: 1px solid #eee; border-radius: 8px; }
+.info { margin-top: 8px; font-size: 15px; background: #f6f8fb; border-left: 4px solid #1f77b4; padding: 6px 10px; font-variant-numeric: tabular-nums; line-height: 1.6; }
+.info b { color: #d62728; }
+</style>
+</head>
+<body>
+<div class="bar">
+  <button class="main" id="play"></button>
+  <button id="next">次の n ▶|</button>
+  <button id="reset">↺ はじめから</button>
+</div>
+<canvas id="scene"></canvas>
+<div class="info" id="info"></div>
+<script>
+/*__COMMON__*/
+</script>
+<script>
+(function () {
+  "use strict";
+  var P = /*__PARAMS__*/;   // {a, b, atext, btext}：atext / btext は各項の表示（分数など）
+  var a = P.a, b = P.b, A = a.length, B = b.length, M = A + B - 1;
+  var c = []; for (var n = 0; n < M; n++) { var s = 0; for (var k = 0; k < A; k++) if (n - k >= 0 && n - k < B) s += a[k] * b[n - k]; c.push(s); }
+  var t = 0;   // いまの n（実数：n と n+1 の間は b がすべって動く）
+  var lo = -(B - 1) - 0.6, hi = M - 1 + 0.6;
+  function mx(v) { return Math.max.apply(null, v.map(Math.abs)) || 1; }
+  var ma = mx(a), mb = mx(b), mc = mx(c);
+
+  var draw = AN.canvas("scene", function (ctx, w, h) {
+    var left = 70, right = 12, W = w - left - right, X = function (k) { return left + (k - lo) / (hi - lo) * W; }, cw = Math.max(4, W / (hi - lo) * 0.62);
+    var rows = [{ y: 18, h: 92, label: "aₖ" }, { y: 140, h: 92, label: "bₙ₋ₖ" }, { y: 270, h: 120, label: "cₙ" }];
+    var n0 = Math.min(M - 1, Math.floor(t + 1e-9)), f = Math.min(1, t - n0), sh = n0 + (f > 0.5 ? (f - 0.5) * 2 : 0);   // 前半：止まる、後半：すべる
+    rows.forEach(function (r) {
+      ctx.strokeStyle = "#ccc"; ctx.beginPath(); ctx.moveTo(left, r.y + r.h); ctx.lineTo(w - right, r.y + r.h); ctx.stroke();
+      AN.text(ctx, r.label, 8, r.y + r.h / 2 + 5, "#333", "left", "bold 14px sans-serif");
+    });
+    // k の目盛
+    for (var k = Math.ceil(lo); k <= Math.floor(hi); k++) AN.text(ctx, String(k), X(k), rows[1].y + rows[1].h + 14, "#999", "center", "10px sans-serif");
+    function bar(k, v, m, r, color, txt) {
+      var hh = v / m * (r.h - 16);
+      ctx.fillStyle = color; ctx.fillRect(X(k) - cw / 2, r.y + r.h - Math.max(0, hh), cw, Math.abs(hh));
+      if (txt && cw > 14) AN.text(ctx, txt, X(k), r.y + r.h - Math.max(0, hh) - 3, "#333", "center", "11px sans-serif");
+    }
+    // a
+    for (k = 0; k < A; k++) {
+      var on = n0 - k >= 0 && n0 - k < B && f <= 0.5;
+      bar(k, a[k], ma, rows[0], on ? "#1f77b4" : "rgba(31,119,180,0.35)", P.atext[k]);
+    }
+    // b を左右反転してずらしたもの：位置 k に b_{n−k}
+    for (var j = 0; j < B; j++) {
+      var kk = sh - j, inA = f <= 0.5 && kk >= -1e-9 && kk <= A - 1 + 1e-9 && Math.abs(kk - Math.round(kk)) < 1e-9;
+      bar(kk, b[j], mb, rows[1], inA ? "#ff7f0e" : "rgba(255,127,14,0.35)", P.btext[j]);
+    }
+    // 重なり（掛け算する組）を線で
+    if (f <= 0.5) for (k = 0; k < A; k++) if (n0 - k >= 0 && n0 - k < B) {
+      ctx.save(); ctx.strokeStyle = "rgba(214,39,40,0.6)"; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(X(k), rows[0].y + rows[0].h); ctx.lineTo(X(k), rows[1].y + rows[1].h - 2); ctx.stroke(); ctx.restore();
+      AN.text(ctx, "×", X(k), rows[1].y - 8, "#d62728", "center", "bold 13px sans-serif");
+    }
+    // c（できた所まで）
+    for (n = 0; n <= n0; n++) bar(n, c[n], mc, rows[2], n === n0 ? "#d62728" : "rgba(214,39,40,0.4)", (n === n0 || M <= 16) ? AN.fmt(c[n]) : "");
+    for (n = 0; n < M; n++) AN.text(ctx, String(n), X(n), rows[2].y + rows[2].h + 14, "#999", "center", "10px sans-serif");
+  });
+
+  function fmtv(v) { return AN.fmt(v); }
+  function info() {
+    var n0 = Math.min(M - 1, Math.floor(t + 1e-9)), terms = [];
+    for (var k = 0; k < A; k++) if (n0 - k >= 0 && n0 - k < B) terms.push({ k: k, s: P.atext[k] + "×" + P.btext[n0 - k], v: a[k] * b[n0 - k] });
+    document.getElementById("info").innerHTML = "c<sub>" + n0 + "</sub> = " + terms.map(function (q) { return "a<sub>" + q.k + "</sub>b<sub>" + (n0 - q.k) + "</sub>"; }).join(" + ")
+      + "<br>　　= " + terms.map(function (q) { return q.s; }).join(" + ") + " = <b>" + fmtv(c[n0]) + "</b>"
+      + "<br><span style='font-size:13px;color:#555'>b を左右に反転して n だけずらし、a と重なった所どうしを掛けて足す（番号の和がいつも n）</span>";
+  }
+  function redraw() { draw(); info(); }
+  var player = new AN.Player(document.getElementById("play"), function (dt) {
+    if (t >= M - 1) t = 0;
+    t += dt * 0.6;
+    if (t >= M - 1) { t = M - 1; redraw(); return false; }
+    redraw();
+  });
+  document.getElementById("next").addEventListener("click", function () {
+    player.stop();
+    var target = Math.min(M - 1, Math.floor(t + 1e-9) + 1), from = t, t0 = null;
+    function anim(ts) { if (t0 === null) t0 = ts; var q = Math.min(1, (ts - t0) / 700); t = from + (target - from) * q; redraw(); if (q < 1) requestAnimationFrame(anim); }
+    requestAnimationFrame(anim);
+  });
+  document.getElementById("reset").addEventListener("click", function () { player.stop(); t = 0; redraw(); });
+  redraw();
+  window.__test = { set: function (v) { t = v; redraw(); }, c: c };
+})();
+</script>
+</body>
+</html>
