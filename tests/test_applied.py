@@ -217,6 +217,24 @@ def test_models():
     assert abs(side_doubling(30, True)[-1][1] - math.pi) < 1e-14 and side_doubling(30, False)[-1][1] == 0.0
 
 
+def test_tentmap():
+    from fractions import Fraction as Fr
+    from utils.tentmap import binary_digits, eventual_period, float_collapse_step, orbit, parse_x0, tent, to_logistic
+    assert orbit(Fr(1, 7), 4) == [Fr(1, 7), Fr(2, 7), Fr(4, 7), Fr(6, 7), Fr(2, 7)]
+    assert eventual_period(Fr(1, 7)) == (1, 3) and eventual_period(Fr(3, 8)) == (4, 1) and eventual_period(Fr(2, 3)) == (0, 1)
+    assert eventual_period(parse_x0("5/13")) == (1, 6) and parse_x0("0.3") == Fr(3, 10)
+    assert binary_digits(Fr(1, 7), 9) == "001001001" and binary_digits(Fr(2, 3), 6) == "101010"
+    # 2 進数：1 けた目が 1 なら、ずらして 0 と 1 を入れかえる
+    for x in (Fr(5, 13), Fr(3, 10), Fr(6, 7)):
+        b, nb = binary_digits(x, 30), binary_digits(tent(x), 29)
+        assert nb == (b[1:] if b[0] == "0" else "".join("1" if c == "0" else "0" for c in b[1:]))
+    assert 50 <= float_collapse_step(0.3) <= 60
+    # sin² で移すとロジスティック写像（a = 4）
+    for y in (Fr(1, 7), Fr(3, 10), Fr(5, 13)):
+        x = to_logistic(y)
+        near(to_logistic(tent(y)), 4 * x * (1 - x), 1e-12)
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_") and callable(fn):
