@@ -23,6 +23,10 @@ PAGES = {
         st.Page("views/loan_textbook.py", title="ローン返済で学ぶ漸化式（月次・総合）", icon="📘",
                 url_path="loan_textbook"),
     ],
+    "演習": [
+        st.Page("views/ex_seq1.py", title="演習（等差数列・等比数列と和）", icon="✏️", url_path="ex_seq1"),
+        st.Page("views/ex_seq2.py", title="演習（漸化式と数学的帰納法）", icon="✏️", url_path="ex_seq2"),
+    ],
     "物理への応用": [
         st.Page("views/bounce.py", title="ボールの跳ね返り（無限等比級数）", icon="🏀", url_path="bounce"),
         st.Page("views/projectile_drag.py", title="空気抵抗のある斜方投射", icon="⚾", url_path="projectile_drag"),

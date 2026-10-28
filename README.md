@@ -47,11 +47,28 @@ Streamlit Community Cloud で公開する、数列の学習用 Web アプリで�
 
 各ページの「例題を読み込む」で、課題と同じ数値を読み込めます。
 
+## 演習（数値を変えた類題）
+
+| ページ | 問題の型（基本 / 標準） | ファイル |
+|---|---|---|
+| 演習（等差数列・等比数列と和） | 等差数列の一般項、等比数列の一般項、等差数列の和、等比数列の和 / 2 つの項から一般項（等差・等比）、Σ の計算、階差数列 | `exercises/ex_seq1.py` |
+| 演習（漸化式と数学的帰納法） | 漸化式と項、等差型・等比型 / $a_{n+1} = pa_n + q$ 型、数学的帰納法（等式・倍数） | `exercises/ex_seq2.py` |
+
+- 応用数学ラボ・Triangle_phase と同じしくみ。難易度と問題の型を選び、4 択で解く。誤答には間違えやすい点（`why`）、ヒントは 1 段ずつ。
+- 「セット番号」が同じなら同じ問題、「同じ型でもう一問」で数値だけを変えた類題。答えは分数で厳密に計算している。
+- 表示中の問題を LaTeX 一式（`数学IB演習.tex` / `数学IB演習-Ans.tex` + `problems.tex` / `answers.tex`）でダウンロードできる。
+  サーバーに LaTeX がないときは印刷用ページ（.html）を出す（ブラウザの「印刷」→「PDF に保存」）。
+- `exercises/` の `ex_core.py`・`radicals.py`・`seq_common.py`・`ex_seq1.py`・`ex_seq2.py` は、試験作成用の Project-TS の
+  `topics/` と**同じファイル**。演習で練習した型が数値を変えて試験に出る。どちらかを直したら、もう一方にもコピーする
+  （Project-TS の `tests/check_sync.py` で確かめられる）。
+- テスト：`python -m pytest tests/test_exercises.py`
+
 ## ファイル構成
 
 ```
 LevelPayment.py        エントリーポイント（ページ一覧はここで管理）
-views/                 各ページ
+views/                 各ページ（ex_seq1.py・ex_seq2.py が演習）
+exercises/             演習の問題の型と画面・LaTeX（Project-TS と共通のファイル）
 utils/sequences.py     数列の計算（Fraction で厳密計算、Streamlit に依存しない）
 utils/level_payment.py 月次ローンの計算クラス（旧 LevelPayment.py から移動）
 utils/applied.py       物理・各学科への応用ページの計算（Streamlit に依存しない）

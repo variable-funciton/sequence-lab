@@ -35,6 +35,20 @@ for i, (title, desc, rel, path) in enumerate(CARDS):
         st.caption(f"関連: {rel}")
         st.page_link(path, label="ページを開く", icon="➡️")
 
+st.markdown("### 演習（数値を変えた類題）")
+st.markdown("4 択で解くと正誤と、まちがえたときはどこでまちがえやすいかが出ます。ヒントは 1 段ずつ。"
+            "「セット番号」が同じなら同じ問題が出ます。紙で解きたいときは LaTeX や印刷用ページでダウンロードできます。")
+EX_CARDS = [
+    ("✏️ 演習（等差数列・等比数列と和）", "一般項、2 つの項から一般項、和、Σ の計算、階差数列。", "views/ex_seq1.py"),
+    ("✏️ 演習（漸化式と数学的帰納法）", r"漸化式で定まる項、等差型・等比型、$a_{n+1} = pa_n + q$ 型、数学的帰納法。", "views/ex_seq2.py"),
+]
+cols = st.columns(2)
+for i, (title, desc, path) in enumerate(EX_CARDS):
+    with cols[i % 2], st.container(border=True):
+        st.subheader(title)
+        st.markdown(desc)
+        st.page_link(path, label="演習を開く", icon="➡️")
+
 st.markdown("### 物理・各学科・プログラミングへの応用")
 st.markdown("数列が、物理や機械・電気・化学・都市（土木・建築）・ビジネスの場面でどのように使われているかを見るページです。")
 APPLIED = [
