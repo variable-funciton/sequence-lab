@@ -235,6 +235,30 @@ def test_tentmap():
         near(to_logistic(tent(y)), 4 * x * (1 - x), 1e-12)
 
 
+def test_convolution():
+    from fractions import Fraction as Fr
+    from utils.convolution import conv_terms, convolve, dice_dist, dot, moving_average, multiply_digits, parse_seq, pascal
+    assert dot([3, 1, 2], [2, 4, 5]) == 20
+    assert convolve([1, 2], [1, 3, 1]) == [1, 5, 7, 2]
+    assert parse_seq("1/2, 1/3、2") == [Fr(1, 2), Fr(1, 3), 2]
+    d = dice_dist(2)
+    assert d[7 - 2] == Fr(1, 6) and sum(d) == 1 and d[4 - 2] == Fr(3, 36)
+    assert pascal(5)[-1] == [1, 5, 10, 10, 5, 1]
+    near(moving_average([1, 2, 3, 4, 5], 3)[0], 2)
+    for x, y in [(123, 45), (999, 999), (7, 8), (12345678, 87654321)]:
+        assert multiply_digits(x, y)[2] == x * y
+    assert [k for k, _, _ in conv_terms([1, 2, 3], [1, 1, 1, 1], 2)] == [0, 1, 2]
+    # 積立の漸化式 = 畳み込み
+    u, r = [100, 100, 500, 100], 0.05
+    x, rec = 0.0, []
+    for v in u:
+        x = (1 + r) * x + v
+        rec.append(x)
+    conv = convolve(u, [(1 + r) ** j for j in range(len(u))])
+    for a, b in zip(rec, conv):
+        near(a, b)
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_") and callable(fn):
