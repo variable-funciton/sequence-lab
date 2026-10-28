@@ -1,4 +1,4 @@
-"""数列のシミュレーション（数学B 後期）— エントリーポイント
+"""数列のシミュレーション（数学IB 後期）— エントリーポイント
 
 Streamlit Community Cloud の Main file path は従来どおり LevelPayment.py のままで動く。
 ページを増やすときは views/ にファイルを作り、下の PAGES に 1 行追加する。
@@ -47,8 +47,9 @@ PAGES = {
         st.Page("views/traffic.py", title="交通渋滞のセルオートマトン", icon="🚗", url_path="traffic"),
         st.Page("views/pollution.py", title="環境汚染と自浄作用", icon="🌊", url_path="pollution"),
     ],
-    "生物・社会のための数列": [
+    "カオス・生物・社会のための数列": [
         st.Page("views/logistic.py", title="ロジスティック写像とカオス", icon="🦋", url_path="logistic"),
+        st.Page("views/tent_chaos.py", title="テントマップのカオス力学系", icon="⛺", url_path="tent_chaos"),
         st.Page("views/sir.py", title="感染症の流行モデル（SIR）", icon="🦠", url_path="sir"),
     ],
     "ビジネスのための数列": [
